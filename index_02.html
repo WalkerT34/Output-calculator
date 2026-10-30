@@ -1,0 +1,257 @@
+<!doctype html>
+<!--
+УРОК 01. ТРЕБОВАНИЯ
+1. Один автономный index.html: HTML, CSS и JavaScript, без внешних библиотек.
+2. Ввод: годовая переработка (млн т/год), рабочие дни в году, часы работы в сутки.
+3. Все значения — конечные положительные числа; дни <= 366; часы <= 24.
+   Дробные значения допускаются, например 23,5 часа; запятая и точка равнозначны.
+4. Вывод: среднечасовая производительность в т/ч и среднесуточная в т/сут
+   (на рабочие сутки), один знак после запятой.
+5. При ошибке прежний результат очищается; причина указывается у поля.
+6. Учебный пример: 60 млн т/год / 330 дней / 24 ч = 7 575,8 т/ч;
+   60 млн т/год / 330 дней = 181 818,2 т/сут.
+
+АЛГОРИТМ
+Прочитать поля -> проверить числа и диапазоны -> млн т перевести в тонны ->
+разделить на дни для т/сут, на дни и часы для т/ч -> проверить конечность результатов ->
+округлить при выводе до одного знака -> показать результат с единицами.
+При ошибке очистить прежний результат и показать причину.
+-->
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Автономный калькулятор производительности фабрики в т/ч и т/сут. Урок 01.">
+  <title>Урок 01 · Производительность фабрики</title>
+  <style>
+    :root { color-scheme: light; --ink:#192e3b; --muted:#586b75; --line:#d7deda; --paper:#f5f5ef; --accent:#e4a32a; --error:#a12828; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--paper); line-height:1.55; }
+    main { width:min(1060px,100%); margin:auto; padding:44px 28px 32px; }
+    .eyebrow { display:flex; gap:12px; align-items:center; font-size:12px; font-weight:750; letter-spacing:.13em; text-transform:uppercase; }
+    .badge { background:var(--ink); color:white; padding:5px 9px; border-radius:4px; }
+    h1 { font-size:clamp(30px,4.6vw,49px); line-height:1.13; letter-spacing:-.035em; margin:24px 0 15px; max-width:800px; }
+    .intro { color:var(--muted); margin:0 0 30px; max-width:650px; }
+    .calculator { display:grid; grid-template-columns:1.1fr 1fr; border:1px solid var(--line); border-radius:16px; overflow:hidden; background:white; }
+    form { padding:30px; }
+    h2 { font-size:18px; margin:0 0 22px; }
+    .field { margin:0 0 18px; }
+    label { display:block; font-weight:650; font-size:14px; margin-bottom:7px; }
+    .input-wrap { position:relative; }
+    input { width:100%; padding:13px 114px 13px 14px; font:600 20px/1.3 system-ui,sans-serif; border:1px solid #aebdb8; border-radius:7px; color:var(--ink); background:#fff; }
+    input:focus-visible, button:focus-visible, summary:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+    input[aria-invalid="true"] { border-color:var(--error); }
+    .unit { position:absolute; right:14px; top:17px; font-size:13px; color:var(--muted); pointer-events:none; }
+    .hint { font-size:12px; color:var(--muted); margin:6px 0 0; }
+    .error { font-size:13px; color:var(--error); margin:6px 0 0; }
+    .error:empty { display:none; }
+    .buttons { display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
+    button { cursor:pointer; border-radius:7px; padding:12px 17px; font:650 14px system-ui,sans-serif; }
+    .primary { background:var(--ink); color:white; border:1px solid var(--ink); flex:1; }
+    .primary:hover { background:#284958; }
+    .secondary { background:white; color:var(--ink); border:1px solid var(--line); }
+    .secondary:hover { background:var(--paper); }
+    .result-panel { background:var(--ink); color:white; padding:30px; display:flex; flex-direction:column; }
+    .result-title { color:#d5dfdf; font-size:14px; margin:0; }
+    .result-number { display:block; font-size:clamp(38px,5vw,60px); font-weight:650; letter-spacing:-.04em; line-height:1.2; margin-top:26px; overflow-wrap:anywhere; }
+    .result-unit { font-size:19px; color:#efb94b; margin:4px 0 20px; }
+    .daily-result { border-top:1px solid #49606b; padding-top:16px; margin-bottom:10px; }
+    .daily-result .result-number { font-size:clamp(30px,4vw,42px); margin-top:10px; }
+    #status { font-size:14px; color:#d5dfdf; min-height:44px; margin:0 0 28px; }
+    .formula { border-top:1px solid #49606b; padding-top:22px; margin-top:auto; }
+    .formula small { display:block; color:#c3d0d3; margin-bottom:9px; }
+    .formula p { font-size:19px; margin:0 0 8px; }
+    #substitution, #daily-substitution { color:#c3d0d3; font-size:13px; overflow-wrap:anywhere; }
+    .note { font-size:12px; color:var(--muted); margin:15px 0 28px; }
+    details { border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:17px 0; }
+    summary { cursor:pointer; font-weight:650; }
+    .learning { display:grid; grid-template-columns:1fr 1fr; gap:28px; padding:12px 0 5px; font-size:14px; }
+    h3 { font-size:14px; margin:10px 0; }
+    ol { padding-left:21px; margin:8px 0; }
+    li { margin-bottom:5px; }
+    code { font-family:Consolas,monospace; background:#e8ede7; padding:2px 4px; border-radius:3px; }
+    footer { font-size:12px; color:var(--muted); margin-top:22px; }
+    [hidden] { display:none !important; }
+    @media(max-width:700px) { main { padding:25px 18px; } .calculator,.learning { grid-template-columns:1fr; } form,.result-panel { padding:24px; } h1 { margin-top:22px; } .result-number { margin-top:16px; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow"><span class="badge">Урок 01</span><span>Инженерный калькулятор</span></div>
+  <h1>Производительность<br>фабрики</h1>
+  <p class="intro">Рассчитайте среднечасовую и среднесуточную производительность по годовой переработке и рабочему времени фабрики.</p>
+  <section class="calculator" aria-label="Калькулятор производительности в т/ч и т/сут">
+    <form id="calculator" novalidate>
+      <h2>Исходные данные</h2>
+      <div class="field">
+        <!-- УЧЕБНОЕ ЗАДАНИЕ: измените только текст этой подписи label. -->
+        <label for="annual">Переработка руды за год</label>
+        <div class="input-wrap"><input id="annual" name="annual" type="text" inputmode="decimal" value="60" autocomplete="off" required aria-describedby="annual-hint annual-error"><span class="unit">млн т/год</span></div>
+        <p class="hint" id="annual-hint">Больше 0. Дробную часть можно вводить через запятую.</p>
+        <p class="error" id="annual-error"></p>
+      </div>
+      <div class="field">
+        <label for="days">Рабочие дни в году</label>
+        <div class="input-wrap"><input id="days" name="days" type="text" inputmode="decimal" value="330" autocomplete="off" required aria-describedby="days-hint days-error"><span class="unit">дней/год</span></div>
+        <p class="hint" id="days-hint">Больше 0 и не больше 366.</p>
+        <p class="error" id="days-error"></p>
+      </div>
+      <div class="field">
+        <label for="hours">Часы работы в сутки</label>
+        <div class="input-wrap"><input id="hours" name="hours" type="text" inputmode="decimal" value="24" autocomplete="off" required aria-describedby="hours-hint hours-error"><span class="unit">ч/сут</span></div>
+        <p class="hint" id="hours-hint">Больше 0 и не больше 24.</p>
+        <p class="error" id="hours-error"></p>
+      </div>
+      <div class="buttons"><button class="primary" type="submit">Рассчитать <span aria-hidden="true">→</span></button><button class="secondary" id="example" type="button">Учебный пример</button></div>
+    </form>
+    <div class="result-panel" aria-live="polite" aria-atomic="true">
+      <p class="result-title">Среднечасовая производительность</p>
+      <output id="result" class="result-number" for="annual days hours">—</output>
+      <p class="result-unit">т/ч</p>
+      <div class="daily-result">
+        <p class="result-title">Среднесуточная производительность</p>
+        <output id="daily-result" class="result-number" for="annual days">—</output>
+        <p class="result-unit">т/сут · на рабочие сутки</p>
+      </div>
+      <p id="status">Введите данные и нажмите «Рассчитать».</p>
+      <div class="formula"><small>Формулы расчёта</small><p>т/ч = M × 1 000 000 / (D × H)</p><div id="substitution">M — млн т/год · D — дней/год · H — ч/сут</div><p>т/сут = M × 1 000 000 / D</p><div id="daily-substitution"></div></div>
+    </div>
+  </section>
+  <p class="note">т/сут — переработка за рабочие сутки: т/ч × заданные часы работы в сутки. При изменении часов т/сут остаётся прежней, а т/ч меняется. Пиковая нагрузка и запас производительности оборудования в формулы не входят.</p>
+  <details>
+    <summary>Как устроен расчёт · разбор урока</summary>
+    <div class="learning">
+      <div><h3>Алгоритм</h3><ol><li>Прочитать три поля ввода.</li><li>Проверить числа, положительность и верхние границы.</li><li>Перевести миллионы тонн в тонны.</li><li>Разделить массу на рабочие дни для т/сут, на рабочие дни и часы в сутки — для т/ч.</li><li>Вывести оба результата с одним знаком после запятой. При ошибке очистить оба результата и объяснить причину.</li></ol></div>
+      <div><h3>Найдите эти места в коде</h3><p><code>readInputs()</code> читает поля; <code>validateInputs()</code> проверяет их; <code>calculateThroughput()</code> выполняет расчёт; <code>renderCalculation()</code> показывает результат.</p><p>Откройте файл в текстовом редакторе и найдите комментарий «УЧЕБНОЕ ЗАДАНИЕ». Измените подпись «Годовая переработка» на «Переработка руды за год», сохраните файл и обновите страницу.</p></div>
+    </div>
+  </details>
+  <footer>Один файл · Работает без интернета · Данные обрабатываются в вашем браузере</footer>
+  <noscript><p class="error">Для работы калькулятора включите JavaScript в браузере.</p></noscript>
+</main>
+<script>
+  'use strict';
+
+  const fieldIds = ['annual', 'days', 'hours'];
+  const form = document.getElementById('calculator');
+  const numberFormat = new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 1, maximumFractionDigits: 1
+  });
+  const inputFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 12 });
+
+  // 1. ВВОД: читаем строки, не преобразуя пустое поле в ноль.
+  function readInputs() {
+    return Object.fromEntries(fieldIds.map(id => [id, document.getElementById(id).value.trim()]));
+  }
+
+  // 2. ПРОВЕРКА: разрешаем обычные десятичные числа с точкой или запятой.
+  function validateInputs(raw) {
+    const values = {};
+    const errors = {};
+    const titles = { annual: 'Годовая переработка', days: 'Рабочие дни', hours: 'Часы работы' };
+    const limits = { days: 366, hours: 24 };
+    for (const id of fieldIds) {
+      const text = raw[id];
+      if (text === '') {
+        errors[id] = 'Заполните поле «' + titles[id] + '».';
+        continue;
+      }
+      if (!/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(text)) {
+        errors[id] = 'Введите число, например 60 или 23,5.';
+        continue;
+      }
+      const value = Number(text.replace(',', '.'));
+      if (!Number.isFinite(value)) {
+        errors[id] = 'Число слишком велико. Уменьшите значение.';
+      } else if (value <= 0) {
+        errors[id] = 'Значение должно быть больше 0.';
+      } else if (limits[id] !== undefined && value > limits[id]) {
+        errors[id] = 'Значение должно быть не больше ' + limits[id] + '.';
+      } else {
+        values[id] = value;
+      }
+    }
+    return { values, errors };
+  }
+
+  // 3. РАСЧЁТ: получает проверенные числа; не читает и не меняет HTML.
+  // annualMillionTonnes * 1 000 000 = тонн в год.
+  // workingDays * hoursPerDay = рабочих часов в год.
+  // annualTonnes / workingDays = тонн за рабочие сутки.
+  // Возвращает оба результата без округления. Округление — только при выводе.
+  function calculateThroughput(annualMillionTonnes, workingDays, hoursPerDay) {
+    const annualTonnes = annualMillionTonnes * 1_000_000;
+    const annualHours = workingDays * hoursPerDay;
+    const tonnesPerHour = annualTonnes / annualHours;
+    const tonnesPerDay = annualTonnes / workingDays;
+    if (!Number.isFinite(annualTonnes) || !Number.isFinite(annualHours) ||
+        annualHours <= 0 || !Number.isFinite(tonnesPerHour) || tonnesPerHour <= 0 ||
+        !Number.isFinite(tonnesPerDay) || tonnesPerDay <= 0) {
+      throw new RangeError('Значения слишком велики или слишком малы для расчёта. Проверьте исходные данные.');
+    }
+    return { tonnesPerHour, tonnesPerDay };
+  }
+
+  function clearResult(message) {
+    document.getElementById('result').textContent = '—';
+    document.getElementById('daily-result').textContent = '—';
+    document.getElementById('status').textContent = message;
+    document.getElementById('substitution').textContent = 'M — млн т/год · D — дней/год · H — ч/сут';
+    document.getElementById('daily-substitution').textContent = '';
+  }
+
+  function clearErrors() {
+    for (const id of fieldIds) {
+      document.getElementById(id).removeAttribute('aria-invalid');
+      document.getElementById(id + '-error').textContent = '';
+    }
+  }
+
+  // 4. ВЫВОД: проверяем ввод и показываем результат или ошибки.
+  function renderCalculation() {
+    clearErrors();
+    clearResult('');
+    const { values, errors } = validateInputs(readInputs());
+    if (Object.keys(errors).length > 0) {
+      for (const [id, message] of Object.entries(errors)) {
+        document.getElementById(id).setAttribute('aria-invalid', 'true');
+        document.getElementById(id + '-error').textContent = message;
+      }
+      clearResult('Расчёт не выполнен. Исправьте отмеченные поля.');
+      document.getElementById(Object.keys(errors)[0]).focus();
+      return;
+    }
+    try {
+      const result = calculateThroughput(values.annual, values.days, values.hours);
+      document.getElementById('result').textContent = numberFormat.format(result.tonnesPerHour);
+      document.getElementById('daily-result').textContent = numberFormat.format(result.tonnesPerDay);
+      document.getElementById('status').textContent = 'Расчёт выполнен · оба результата с одним знаком после запятой';
+      document.getElementById('substitution').textContent =
+        inputFormat.format(values.annual) + ' × 1 000 000 / (' +
+        inputFormat.format(values.days) + ' × ' + inputFormat.format(values.hours) + ')';
+      document.getElementById('daily-substitution').textContent =
+        inputFormat.format(values.annual) + ' × 1 000 000 / ' + inputFormat.format(values.days);
+    } catch (error) {
+      clearResult(error.message);
+    }
+  }
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    renderCalculation();
+  });
+  for (const id of fieldIds) {
+    document.getElementById(id).addEventListener('input', () => {
+      clearErrors();
+      clearResult('Данные изменены. Нажмите «Рассчитать».');
+    });
+  }
+  document.getElementById('example').addEventListener('click', () => {
+    document.getElementById('annual').value = '60';
+    document.getElementById('days').value = '330';
+    document.getElementById('hours').value = '24';
+    renderCalculation();
+  });
+  renderCalculation();
+</script>
+</body>
+</html>
